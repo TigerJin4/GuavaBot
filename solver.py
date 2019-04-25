@@ -56,31 +56,21 @@ def solve(client):
                 remote_result = client.remote(currentNode, toNode)
                 must_have[toNode] += remote_result
                 mistake = mistake + (remote_result == False)
-                continue
+                pass
             else:
                 weighted_authority = mistake / sum(mistake)
-                 
+                if scout_result * weighted_authority >= cutoff:
+                    remote_result = client.remote(currentNode, toNode)
+                    if remote_result == 0:
+                        students_correctness = (scout_result == remote_result)
+                        mistake = mistake + (1 - students_correctness)
+                    else:
+                        students_correctness = (scout_result == 1)
+                        mistake = mistake + (1 - students_correctness)
+                        must_have[toNode] += remote_result
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    numIterations = len(topological_order) // 2
+    cutpoint = 0.5 
+    phaseOne(numIterations)
+    phaseTwo(cutpoint)
     client.end()
