@@ -59,7 +59,7 @@ def solve(client):
                 continue
             else:
                 weighted_authority = mistake / sum(mistake)
-                
+                 
 
 
 
