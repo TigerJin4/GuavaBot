@@ -38,10 +38,10 @@ def solve(client):
             scout_result = np.array(client.scout(frumNode, all_students))
             remote_result = client.remote(frumNode, toNode)
             if remote_result == 0:
-                students_correctness = ((scout_result - remote_result) == 0)
+                students_correctness = (scout_result == remote_result)
                 mistake = mistake + (1 - students_correctness)
             else:
-                students_correctness = ((scout_result - 1) == 0)
+                students_correctness = (scout_result == 1)
                 mistake = mistake + (1 - students_correctness)
                 must_have[toNode] += remote_result
 
