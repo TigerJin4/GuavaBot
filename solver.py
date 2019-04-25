@@ -26,11 +26,12 @@ def solve(client):
     for node in guavaGraph.nodes:
         must_have[node] = 0
 
-
+    num_Nodes_examined = -1
     def phaseOne(num_iterations):
         ## Input: number of iterations for the exploration proccess
         ## Remote on each iteration; update information and knowledge about students
         for i in range(num_iterations):
+            num_Nodes_examined += 1
             frumNode = topological_order[i]
             toNode = predecessor[frumNode]
             ##A list of boolean values: the students' prediction on whether the "frumNode" has bots
@@ -43,7 +44,27 @@ def solve(client):
                 students_correctness = ((scout_result - 1) == 0)
                 mistake = mistake + (1 - students_correctness)
                 must_have[toNode] += remote_result
-    
+
+    def phaseTwo(cutoff):
+        ## Input: cutoff point for the confidence that the target point has a bot
+        for i in range(num_Nodes_examined, len(topological_order)):
+            currentNode = topological_order[i]
+            toNode = predecessor[currentNode]
+            scout_result = np.array(client.scout(currentNode, all_students))
+            max_num = max(mistake)
+            if must_have[currentNode] > 0:
+                remote_result = client.remote(currentNode, toNode)
+                must_have[toNode] += remote_result
+                mistake = mistake + (remote_result == False)
+                continue
+            else:
+                weighted_authority = mistake / sum(mistake)
+                
+
+
+
+
+
 
 
 
