@@ -41,6 +41,8 @@ def solve(client):
             if not cannotscout[frumNode]:
                 can_update_mistake = True
                 scout_result = np.array(list(client.scout(frumNode, all_students).values()))
+            else:
+                scout_result = 0
             remote_result = client.remote(frumNode, toNode)
             cannotscout[frumNode] = True
             if remote_result > 0:
@@ -65,6 +67,8 @@ def solve(client):
             if not cannotscout[currentNode]:
                 can_update_mistake = True
                 scout_result = np.array(list(client.scout(currentNode, all_students).values()))
+            else:
+                scout_result = 0
             ## max_num = max(mistake)
             if must_have[currentNode] > 0:
                 remote_result = client.remote(currentNode, toNode)
