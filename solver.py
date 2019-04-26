@@ -55,7 +55,7 @@ def solve(client):
             if must_have[currentNode] > 0:
                 remote_result = client.remote(currentNode, toNode)
                 must_have[toNode] += remote_result
-                mistake = mistake + (remote_result == False)
+                mistake = mistake + (scout_result == False)
                 pass
             else:
                 weighted_authority = mistake / sum(mistake)
