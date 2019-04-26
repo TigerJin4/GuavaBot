@@ -31,12 +31,12 @@ def solve(client):
         ## Input: number of iterations for the exploration proccess
         ## Remote on each iteration; update information and knowledge about students
         for i in range(num_iterations):
-        	frumNode = topological_order[i]
-        	toNode = predecessor[frumNode]
-        	scout_result = np.array(client.scout(frumNode, all_students))
-        	remote_result = client.remote(frumNode, toNode)
-        	if remote_result == 0:
-        		students_correctness = (scout_result == remote_result)
+            frumNode = topological_order[i]
+            toNode = predecessor[frumNode]
+            scout_result = np.array(client.scout(frumNode, all_students))
+            remote_result = client.remote(frumNode, toNode)
+            if remote_result == 0:
+                students_correctness = (scout_result == remote_result)
                 mistake = mistake + (1 - students_correctness)
             else:
                 students_correctness = (scout_result == 1)
