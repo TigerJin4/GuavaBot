@@ -17,28 +17,26 @@ def solve(client):
     mst = nx.minimum_spanning_tree(guavaGraph)
     predecessor = nx.dfs_predecessors(mst, guavaHome)
     topological_order = list(nx.dfs_postorder_nodes(mst, guavaHome))
-    all_students = client.k
+    all_students = list(np.arange(client.k)+1)
+
     ## Initiate a dictionary that stores the total number of times that the students made mistake
-    mistake = np.zeros(len(all_students))
+    mistake = np.zeros(client.k)
     ## Keep track of the nodes that must have some bots on it
 
     must_have = {}
     for node in guavaGraph.nodes:
         must_have[node] = 0
 
-    num_Nodes_examined = -1
     def phaseOne(num_iterations):
         ## Input: number of iterations for the exploration proccess
         ## Remote on each iteration; update information and knowledge about students
         for i in range(num_iterations):
-            num_Nodes_examined += 1
-            frumNode = topological_order[i]
-            toNode = predecessor[frumNode]
-            ##A list of boolean values: the students' prediction on whether the "frumNode" has bots
-            scout_result = np.array(client.scout(frumNode, all_students))
-            remote_result = client.remote(frumNode, toNode)
-            if remote_result == 0:
-                students_correctness = (scout_result == remote_result)
+        	frumNode = topological_order[i]
+        	toNode = predecessor[frumNode]
+        	scout_result = np.array(client.scout(frumNode, all_students))
+        	remote_result = client.remote(frumNode, toNode)
+        	if remote_result == 0:
+        		students_correctness = (scout_result == remote_result)
                 mistake = mistake + (1 - students_correctness)
             else:
                 students_correctness = (scout_result == 1)
@@ -47,7 +45,7 @@ def solve(client):
 
     def phaseTwo(cutoff):
         ## Input: integer cutoff point for the confidence that the target point has a bot
-        for i in range(num_Nodes_examined, len(topological_order)):
+        for i in range(num_iterations, len(topological_order)):
             currentNode = topological_order[i]
             toNode = predecessor[currentNode]
             scout_result = np.array(client.scout(currentNode, all_students))
@@ -70,7 +68,7 @@ def solve(client):
                         must_have[toNode] += remote_result
 
     numIterations = len(topological_order) // 2
-    cutpoint = 0.5 
+    cutpoint = 0.5
     phaseOne(numIterations)
     phaseTwo(cutpoint)
     client.end()
