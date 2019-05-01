@@ -4,6 +4,7 @@ import numpy as np
 import random
 from sortedcontainers import SortedDict
 import math
+
 def solve(client):
     client.end()
     client.start()
