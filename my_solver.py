@@ -103,7 +103,7 @@ def solve(client):
                 return
             for student in list(updateResults.keys()):
                 if updateResults[student] == expectedAnswer:
-                    mistake[student] *= (1 - epsilon)
+                    mistake[student] *= (1 - 0.001)
 
     def exploration(degree, eps):
         '''
@@ -138,23 +138,26 @@ def solve(client):
     confid_2 = {}
     pct = []
     def exploitation(prop_cutoff, confidence_cutoff,epsil):
-        print('into exploitation')
         decision_maker = []
         nonlocal overall_results, topological_order, explored, guavaHome
         nonlocal guavaGraph, predecessor, mistake, total_vert, explored
-        nonlocal all_students, confid_2, pct
+        nonlocal all_students, confid_2, pct, remoted_before
         pass_count = 0
         for i in range(len(topological_order) - 1):
             # Pass if explored already
             currentNode = topological_order[i]
-            if explored[currentNode]:
+            if currentNode in remoted_before:
                 continue
 
             toNode = predecessor[currentNode]
 
             # Remote for sure if there are known bots on the current node
             if client.bot_count[currentNode]:
-                remote_and_update(currentNode, toNode, epsil)
+                path = nx.shortest_path(guavaGraph, currentNode, client.home)
+                for k in range(len(path)-1):
+                    remote_and_update(path[k], path[k+1], epsil)
+                if client.l == sum(np.array(client.bot_count)):
+                    return
                 continue
             if client.bot_count[currentNode] == 0:
                 if client.l == sum(np.array(client.bot_count)):
@@ -191,7 +194,7 @@ def solve(client):
                 remote_and_update(currentNode, toNode, epsil)
             #   confid_2[currentNode] = [my_confidence, client.bot_count[toNode]]
 
-            elif discovered_prop < 0.5 and my_confidence >= confidence_cutoff * 0.9:
+            elif discovered_prop < 0.5 and my_confidence >= confidence_cutoff * 0.85:
                 remote_and_update(currentNode, toNode, epsil)
             elif discovered_prop < 0.8 and my_confidence >= confidence_cutoff * 0.95:
                 remote_and_update(currentNode, toNode, epsil)
@@ -201,6 +204,37 @@ def solve(client):
 
         print(pass_count)
         print(decision_maker)
+
+
+    node_confidence = {}
+
+    def new_solver(ep):
+        nonlocal overall_results, topological_order, explored, guavaHome
+        nonlocal guavaGraph, predecessor, mistake, total_vert, explored
+        nonlocal all_students, confid_2, pct, remoted_before, node_confidence
+        print(len(list(overall_results.keys())))
+        for i in range(len(topological_order)-1):
+            scout_nodes([topological_order[i]], all_students)
+        while client.bot_count[client.home] != client.l:
+            highest_confid = 0
+            highest_node = 0
+            for node in list(overall_results.keys()):
+                current_confid = calculate_confidence(node)
+                node_confidence[node] = current_confid
+            for n in list(node_confidence.keys()):
+                if node_confidence[n] >= highest_confid:
+                    highest_confid = node_confidence[n]
+                    highest_node = n
+            print(highest_confid)
+            path = nx.shortest_path(guavaGraph, highest_node, client.home)
+            remote_and_update(path[0], path[1],ep)
+            overall_results[highest_node] = None
+            if client.bot_count[path[1]] != 0:
+                if path[1] != client.home:
+                    for k in range(len(path)-1):
+                        remote_and_update(path[k], path[k+1], ep)
+
+
 
 
 
@@ -218,15 +252,22 @@ def solve(client):
     #phaseOne(numIterations)
     #phaseTwo(cutpoint)
 
-    epsilo = 0.007
+    if len(all_students) == 10:
+        epsilo = 0.22
+    elif len(all_students) == 20:
+        epsilo = 0.2
+    else:
+        epsilo = 0.1
     deg = math.floor(len(mst_leaves) * 0.1)
-    exploration(deg, epsilo)
+    #exploration(deg, epsilo)
     if client.k == 40:
         cut_o = 0.45
     elif client.k == 20:
         cut_o = 0.4
     else:
         cut_o = 0.38
-    exploitation(0.4, cut_o, epsilo)
-    print(confid)
+    #exploitation(0.4, cut_o, epsilo)
+    #print(confid)
+    #naive_solve()
+    new_solver(epsilo)
     client.end()
