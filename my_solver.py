@@ -46,7 +46,7 @@ def solve(client):
     for node in guavaGraph.nodes():
         explored[node] = False
 
-
+    remoted_before = []
     stop_scouting = False
 
     total_vert = len(guavaGraph.nodes())
@@ -59,9 +59,8 @@ def solve(client):
         :return: None
         '''
         nonlocal overall_results, stop_scouting
-        if not client.k == sum(client.bot_count):
-            for node in nodes:
-                overall_results[node]= client.scout(node, students)
+        for node in nodes:
+            overall_results[node]= client.scout(node, students)
     confid = []
     def calculate_confidence(theNode):
         '''
@@ -72,7 +71,9 @@ def solve(client):
         nonlocal overall_results, mistake, confid
         weighted_confidence = 0
         current_node_result = overall_results[theNode]
-        total_weights = sum(np.array([mistake[s] for s in list(current_node_result.keys())]))
+        if current_node_result is None:
+            return int(client.bot_count[theNode] != 0)
+        total_weights = sum(np.array(list(mistake.values())))
         for s in list(current_node_result.keys()):
             weighted_confidence += current_node_result[s] * mistake[s] / total_weights
         confid += [weighted_confidence]
@@ -84,8 +85,9 @@ def solve(client):
         :param toNode: node to perform remote to
         :return:
         '''
-        nonlocal mistake, cannotscout, overall_results, stop_scouting, must_have, num_bots, explored
+        nonlocal mistake, cannotscout, overall_results, stop_scouting, must_have, num_bots, explored, remoted_before
         remote_result = client.remote(fromNode, toNode)
+        remoted_before += [fromNode]
         explored[fromNode] = True
         cannotscout[fromNode] = True
         if remote_result > 0:
@@ -97,6 +99,8 @@ def solve(client):
         if fromNode in list(overall_results.keys()):
             expectedAnswer = (remote_result > 0)
             updateResults = overall_results[fromNode]
+            if not updateResults:
+                return
             for student in list(updateResults.keys()):
                 if updateResults[student] == expectedAnswer:
                     mistake[student] *= (1 - epsilon)
@@ -132,12 +136,13 @@ def solve(client):
                 remote_and_update(currentNode, toNode, eps)
 
     confid_2 = {}
+    pct = []
     def exploitation(prop_cutoff, confidence_cutoff,epsil):
         print('into exploitation')
         decision_maker = []
         nonlocal overall_results, topological_order, explored, guavaHome
         nonlocal guavaGraph, predecessor, mistake, total_vert, explored
-        nonlocal all_students, confid_2
+        nonlocal all_students, confid_2, pct
         pass_count = 0
         for i in range(len(topological_order) - 1):
             # Pass if explored already
@@ -168,14 +173,12 @@ def solve(client):
             #mistake_lower_bound = max_weight - 0.1 * (1 + discovered_prop ** 5)
             #mistake_lower_bound = 0
             #students_to_scout = [s for s in all_students if mistake[s] >= mistake_lower_bound or mistake[s] - min_weight <  0.8 * (1 + discovered_prop ** 5)]
-            percent75 = np.percentile(np.array(list(mistake.values())), 50)
-            students_to_scout = []
-            for stu in all_students:
-                if mistake[stu] >= percent75:
-                    students_to_scout += [stu]
+            #percent75 = np.percentile(np.array(list(mistake.values())), 99)
+            students_to_scout = all_students
+            #for stu in all_students:
+            #    if mistake[stu] >= percent75:
+            #        students_to_scout += [stu]
             scout_nodes([currentNode], students_to_scout)
-            decision_maker += [len(students_to_scout)]
-
             my_confidence = calculate_confidence(currentNode)
             #if discovered_prop <= prop_cutoff:
             #    if my_confidence >= confidence_cutoff:
@@ -188,12 +191,13 @@ def solve(client):
                 remote_and_update(currentNode, toNode, epsil)
             #   confid_2[currentNode] = [my_confidence, client.bot_count[toNode]]
 
-            elif discovered_prop < 0.8 and my_confidence >= confidence_cutoff * 0.9:
+            elif discovered_prop < 0.5 and my_confidence >= confidence_cutoff * 0.9:
+                remote_and_update(currentNode, toNode, epsil)
+            elif discovered_prop < 0.8 and my_confidence >= confidence_cutoff * 0.95:
                 remote_and_update(currentNode, toNode, epsil)
             #    confid_2[currentNode] = [my_confidence, client.bot_count[toNode]]
             else:
                 pass_count += 1
-
 
         print(pass_count)
         print(decision_maker)
@@ -213,11 +217,16 @@ def solve(client):
     #cutpoint = 0.4
     #phaseOne(numIterations)
     #phaseTwo(cutpoint)
-    epsilo = 0.01
+
+    epsilo = 0.007
     deg = math.floor(len(mst_leaves) * 0.1)
     exploration(deg, epsilo)
-    cut_o = 0.40
-
+    if client.k == 40:
+        cut_o = 0.45
+    elif client.k == 20:
+        cut_o = 0.4
+    else:
+        cut_o = 0.38
     exploitation(0.4, cut_o, epsilo)
     print(confid)
     client.end()
