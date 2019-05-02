@@ -73,8 +73,32 @@ def solve(client):
         current_node_result = overall_results[theNode]
         if current_node_result is None:
             return int(client.bot_count[theNode] != 0)
-        total_weights = sum(np.array(list(mistake.values())))
+        total_weights = 0
         for s in list(current_node_result.keys()):
+            total_weights += mistake[s]
+        for s in list(current_node_result.keys()):
+            weighted_confidence += current_node_result[s] * mistake[s] / total_weights
+        confid += [weighted_confidence]
+        return weighted_confidence
+
+    def calculate_confidencee(theNode, top):
+        '''
+        :param scoutResults: A dictionary of scouting results; key: student; value:result
+        :param mistakeDict: An array of students' mistake count; indexed by student - 1
+        :return: a float in [0,1] that indicates the weighted confidence in that the current node has bot
+        '''
+        nonlocal overall_results, mistake, confid
+        weighted_confidence = 0
+        current_node_result = overall_results[theNode]
+        if current_node_result is None:
+            return int(client.bot_count[theNode] != 0)
+        total_weights = 0
+
+        sorted_mistake = sorted(mistake.items(), key = lambda c: (c[1], c[0]), reverse = True)
+        students_list = [pair[0] for pair in sorted_mistake][:top]
+        for s in students_list:
+            total_weights += mistake[s]
+        for s in students_list:
             weighted_confidence += current_node_result[s] * mistake[s] / total_weights
         confid += [weighted_confidence]
         return weighted_confidence
@@ -103,7 +127,7 @@ def solve(client):
                 return
             for student in list(updateResults.keys()):
                 if updateResults[student] == expectedAnswer:
-                    mistake[student] *= (1 - 0.001)
+                    mistake[student] *= (1 - epsilon)
 
     def exploration(degree, eps):
         '''
@@ -213,7 +237,7 @@ def solve(client):
         nonlocal guavaGraph, predecessor, mistake, total_vert, explored
         nonlocal all_students, confid_2, pct, remoted_before, node_confidence
         print(len(list(overall_results.keys())))
-        for i in range(len(topological_order)-1):
+        for i in range(len(topological_order) - 1):
             scout_nodes([topological_order[i]], all_students)
         while client.bot_count[client.home] != client.l:
             highest_confid = 0
@@ -227,37 +251,125 @@ def solve(client):
                     highest_node = n
             print(highest_confid)
             path = nx.shortest_path(guavaGraph, highest_node, client.home)
-            remote_and_update(path[0], path[1],ep)
+            remote_and_update(path[0], path[1], ep)
             overall_results[highest_node] = None
             if client.bot_count[path[1]] != 0:
                 if path[1] != client.home:
-                    for k in range(len(path)-1):
-                        remote_and_update(path[k], path[k+1], ep)
-
-
-
-
-
-
-
-
-
-
-
-
-
+                    for k in range(len(path) - 1):
+                        remote_and_update(path[k], path[k + 1], ep)
 
     #numIterations = len(topological_order) // 10
     #cutpoint = 0.4
     #phaseOne(numIterations)
     #phaseTwo(cutpoint)
+    def new_solver1(ep):
+        nonlocal overall_results, topological_order, explored, guavaHome
+        nonlocal guavaGraph, predecessor, mistake, total_vert, explored
+        nonlocal all_students, confid_2, pct, remoted_before, node_confidence
+
+
+        for i in range(len(topological_order) - 1):
+            stu_to_scout = all_students
+            scout_nodes([topological_order[i]], stu_to_scout)
+        while client.bot_count[client.home] != client.l:
+            highest_confid = 0
+            highest_node = 0
+            for node in list(overall_results.keys()):
+                current_confid = calculate_confidence(node)
+                node_confidence[node] = current_confid
+            for n in list(node_confidence.keys()):
+                if node_confidence[n] >= highest_confid:
+                    highest_confid = node_confidence[n]
+                    highest_node = n
+
+
+
+            curNei = guavaGraph.neighbors(highest_node)
+
+            shortest_nei = 0
+            shortest_len = float('inf')
+
+            for nei in curNei:
+                dist = guavaGraph[highest_node][nei]['weight']
+                if dist < shortest_len:
+                    shortest_len = dist
+                    shortest_nei = nei
+            if shortest_nei != client.home:
+                cutoff = 0.4
+                if len(all_students) == 20:
+                    cutoff = 0.6
+                elif len(all_students) == 10:
+                    cutoff = 0.7
+                else:
+                    cutoff = 0.5
+                if shortest_len / guavaGraph[client.home][highest_node]['weight'] >= cutoff:
+                    shortest_nei = client.home
+            remote_and_update(highest_node, shortest_nei, ep)
+            overall_results[highest_node] = None
+            if client.bot_count[shortest_nei] == 0:
+                continue
+            if shortest_nei == client.home:
+                continue
+            path = nx.shortest_path(guavaGraph, shortest_nei, client.home)
+            for k in range(len(path) - 1):
+                remote_and_update(path[k], path[k + 1], ep)
+
+
+    def new_solver2(ep):
+        nonlocal overall_results, topological_order, explored, guavaHome
+        nonlocal guavaGraph, predecessor, mistake, total_vert, explored
+        nonlocal all_students, confid_2, pct, remoted_before, node_confidence
+        for i in range(len(topological_order) - 1):
+            stu_to_scout = all_students
+            scout_nodes([topological_order[i]], stu_to_scout)
+        while client.bot_count[client.home] != client.l:
+            for node in list(overall_results.keys()):
+                if client.bot_count[client.home] - client.l > 2:
+                    current_confid = calculate_confidencee(node, len(all_students))
+                elif client.bot_count[client.home] - client.l >=2:
+                    current_confid = calculate_confidencee(node, math.ceil(len(all_students)*0.5))
+                else:
+                    current_confid = calculate_confidencee(node,  math.ceil(len(all_students)*0.2))
+
+                node_confidence[node] = current_confid
+            highest_confid = 0
+            highest_node = 0
+            for n in list(node_confidence.keys()):
+                if node_confidence[n] >= highest_confid:
+                    highest_confid = node_confidence[n]
+                    highest_node = n
+
+            curNei = guavaGraph.neighbors(highest_node)
+
+            shortest_nei = 0
+            shortest_len = float('inf')
+
+            for nei in curNei:
+                dist = guavaGraph[highest_node][nei]['weight']
+                if dist < shortest_len:
+                    shortest_len = dist
+                    shortest_nei = nei
+            if shortest_nei != client.home:
+                if shortest_len / guavaGraph[client.home][highest_node]['weight'] >= 9 / 10:
+                    shortest_nei = client.home
+            remote_and_update(highest_node, shortest_nei, ep)
+            overall_results[highest_node] = None
+            if client.bot_count[shortest_nei] == 0:
+                continue
+            if shortest_nei == client.home:
+                continue
+            path = nx.shortest_path(guavaGraph, shortest_nei, client.home)
+            for k in range(len(path) - 1):
+                remote_and_update(path[k], path[k + 1], ep)
+
+
 
     if len(all_students) == 10:
-        epsilo = 0.22
+        epsilo = 0.01
     elif len(all_students) == 20:
-        epsilo = 0.2
+        epsilo = 0.03
     else:
-        epsilo = 0.1
+        epsilo = 0.05
     deg = math.floor(len(mst_leaves) * 0.1)
     #exploration(deg, epsilo)
     if client.k == 40:
@@ -269,5 +381,6 @@ def solve(client):
     #exploitation(0.4, cut_o, epsilo)
     #print(confid)
     #naive_solve()
-    new_solver(epsilo)
+    #new_solver(epsilo)
+    new_solver1(epsilo)
     client.end()
