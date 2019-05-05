@@ -128,6 +128,8 @@ def solve(client):
             for student in list(updateResults.keys()):
                 if updateResults[student] == expectedAnswer:
                     mistake[student] *= (1 - epsilon)
+                else:
+                    mistake[student] *= (1 - epsilon)**(-1)
 
     def exploration(degree, eps):
         '''
